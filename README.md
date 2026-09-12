@@ -109,9 +109,13 @@ where:
 - **I** = insertions
 - **N** = number of words in the reference
 
+WER is used as the **primary evaluation metric** because the main research question concerns word-level ASR robustness.
+
 ### Character Error Rate (CER)
 
-CER provides a character-level measure that complements WER.
+CER provides a **complementary character-level measure** of recognition accuracy.
+
+Using both WER and CER helps assess whether the observed speech-to-singing degradation is consistent across different levels of text representation.
 
 ### Error Decomposition
 
@@ -121,14 +125,11 @@ Recognition errors are additionally decomposed into:
 - deletions
 - insertions
 
-### Statistical Analysis
-
-Because each utterance is evaluated in both conditions, speech and singing are compared using the **Wilcoxon signed-rank test**.
+Because the experiment uses paired recordings, speech and singing WER/CER are compared using the **Wilcoxon signed-rank test**.
 
 The main effect of the speech-to-singing shift is quantified as:
 
 **ΔWER = WER_singing − WER_speech**
-
 
 and similarly for CER.
 
