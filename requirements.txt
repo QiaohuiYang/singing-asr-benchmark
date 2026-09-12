@@ -1,0 +1,7 @@
+faster-whisper
+jiwer
+librosa
+imageio-ffmpeg
+scipy
+matplotlib
+pandas
