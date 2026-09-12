@@ -100,16 +100,14 @@ Inference is performed using [`faster-whisper`](https://github.com/SYSTRAN/faste
 
 ### Word Error Rate (WER)
 
-\[
-WER = \frac{S + D + I}{N}
-\]
+**WER = (S + D + I) / N**
 
 where:
 
-- \(S\) = substitutions
-- \(D\) = deletions
-- \(I\) = insertions
-- \(N\) = number of words in the reference
+- **S** = substitutions
+- **D** = deletions
+- **I** = insertions
+- **N** = number of words in the reference
 
 ### Character Error Rate (CER)
 
@@ -129,9 +127,8 @@ Because each utterance is evaluated in both conditions, speech and singing are c
 
 The main effect of the speech-to-singing shift is quantified as:
 
-\[
-\Delta WER = WER_{singing} - WER_{speech}
-\]
+**ΔWER = WER_singing − WER_speech**
+
 
 and similarly for CER.
 
