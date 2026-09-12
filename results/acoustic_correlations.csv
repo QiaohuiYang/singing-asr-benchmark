@@ -1,0 +1,6 @@
+feature,n,pearson_r
+duration_singing,18,0.02468547062590499
+singing_mean_f0,18,0.31473956493413846
+singing_f0_std,18,-0.3937412881246498
+singing_f0_range,18,-0.2822406053812361
+singing_rms,18,-0.059274479601887566

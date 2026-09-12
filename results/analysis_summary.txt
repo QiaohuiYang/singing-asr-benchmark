@@ -1,0 +1,54 @@
+Singing ASR Benchmark - Exploratory Analysis
+============================================================
+
+Number of paired utterances: 18
+
+Overall performance:
+
+WER:
+  Speech mean    = 0.1344
+  Singing mean   = 0.4083
+  Mean Δ         = 0.2739
+  Speech median  = 0.0556
+  Singing median = 0.3542
+  Median Δ       = 0.1736
+
+CER:
+  Speech mean    = 0.0644
+  Singing mean   = 0.1767
+  Mean Δ         = 0.1123
+  Speech median  = 0.0147
+  Singing median = 0.1588
+  Median Δ       = 0.0973
+
+
+Wilcoxon signed-rank tests:
+
+WER:
+  n pairs   = 18
+  statistic = 4.5000
+  p-value   = 0.006780
+  effect r  = 0.7813
+
+CER:
+  n pairs   = 18
+  statistic = 12.0000
+  p-value   = 0.019223
+  effect r  = 0.6493
+
+
+Acoustic correlations:
+
+  duration_singing: r = 0.0247 (n=18)
+
+  singing_mean_f0: r = 0.3147 (n=18)
+
+  singing_f0_std: r = -0.3937 (n=18)
+
+  singing_f0_range: r = -0.2822 (n=18)
+
+  singing_rms: r = -0.0593 (n=18)
+
+
+Interpretation note:
+Acoustic analyses are exploratory because the current dataset contains only 18 paired utterances.

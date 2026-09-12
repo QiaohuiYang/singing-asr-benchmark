@@ -1,0 +1,18 @@
+# Python virtual environment
+.venv/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Local audio files
+data/audio/
+*.m4a
+*.wav
+
+# VS Code local settings
+.vscode/
+
+# macOS / Windows system files
+.DS_Store
+Thumbs.db

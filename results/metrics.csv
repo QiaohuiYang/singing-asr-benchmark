@@ -1,0 +1,37 @@
+﻿utterance_id,language,language_code,mode,length_group,filename,reference,prediction,WER,CER,substitutions,deletions,insertions
+en_01,English,en,speech,short,En-speak-1.m4a,The morning feels warm and bright.,The morning feels warm and bright.,0.0,0.0,0,0,0
+en_01,English,en,singing,short,En-sing-1.m4a,The morning feels warm and bright.,The morning feels woman bright.,0.3333333333333333,0.11764705882352941,1,1,0
+en_02,English,en,speech,short,En-speak-2.m4a,I love listening to music at night.,I love listening to music at night.,0.0,0.0,0,0,0
+en_02,English,en,singing,short,En-sing-2.m4a,I love listening to music at night.,I love listening to music at night.,0.0,0.0,0,0,0
+en_03,English,en,speech,short,En-speak-3.m4a,Her beautiful voice sounds soft and clear.,Her beautiful voice sounds solved and clear.,0.14285714285714285,0.09523809523809523,1,0,0
+en_03,English,en,singing,short,En-sing-3.m4a,Her beautiful voice sounds soft and clear.,Her beautiful voice sounds soft and clear.,0.0,0.0,0,0,0
+en_04,English,en,speech,medium,En-speak-4.m4a,This song always brings back old memories.,This song always brings back old memories.,0.0,0.0,0,0,0
+en_04,English,en,singing,medium,En-sing-4.m4a,This song always brings back old memories.,This song always brings back old memories.,0.0,0.0,0,0,0
+en_05,English,en,speech,medium,En-speak-5.m4a,Sometimes I listen to music before I sleep.,Sometimes I listen to music before I sleep.,0.0,0.0,0,0,0
+en_05,English,en,singing,medium,En-sing-5.m4a,Sometimes I listen to music before I sleep.,Sometimes I listen to music before I sleep.,0.0,0.0,0,0,0
+en_06,English,en,speech,medium,En-speak-6.m4a,The old memories return when I hear that song.,The old memories return when I hear that song.,0.0,0.0,0,0,0
+en_06,English,en,singing,medium,En-sing-6.m4a,The old memories return when I hear that song.,The old memory streets of one night hear that song,0.6666666666666666,0.34782608695652173,5,0,1
+en_07,English,en,speech,long,En-speak-7.m4a,A quiet melody can make an ordinary evening feel special.,A quiet melody can make an ordinary evening feel special.,0.0,0.0,0,0,0
+en_07,English,en,singing,long,En-sing-7.m4a,A quiet melody can make an ordinary evening feel special.,"Ah, quiet melody can't make it Hold on to the rain evening few special",1.0,0.42105263157894735,6,0,4
+en_08,English,en,speech,long,En-speak-8.m4a,Learning a new language takes time and patience.,Learning a new language takes time and patience.,0.0,0.0,0,0,0
+en_08,English,en,singing,long,En-sing-8.m4a,Learning a new language takes time and patience.,Learning a new language takes time and patience.,0.0,0.0,0,0,0
+en_09,English,en,speech,long,En-speak-9.m4a,Sometimes a simple song can change my whole mood.,Sometimes a single song can change my whole mood.,0.1111111111111111,0.04081632653061224,1,0,0
+en_09,English,en,singing,long,En-sing-9.m4a,Sometimes a simple song can change my whole mood.,Sometimes that Singapore song can change my whole mood,0.3333333333333333,0.20408163265306123,3,0,0
+fr_01,French,fr,speech,short,Fr-speak-1.m4a,Le matin est doux et lumineux.,Le matin est tout et lumineux.,0.16666666666666666,0.06666666666666667,1,0,0
+fr_01,French,fr,singing,short,Fr-sing-1.m4a,Le matin est doux et lumineux.,Le matin est tout élimineux.,0.5,0.2,2,1,0
+fr_02,French,fr,speech,short,Fr-speak-2.m4a,J'aime écouter de la musique le soir.,J'aime écouter de la musique le soir.,0.0,0.0,0,0,0
+fr_02,French,fr,singing,short,Fr-sing-2.m4a,J'aime écouter de la musique le soir.,"J'aime agudateur, la musique, l'ousoir.",0.7142857142857143,0.35135135135135137,3,2,0
+fr_03,French,fr,speech,short,Fr-speak-3.m4a,Sa belle voix est douce et claire.,Sa belle voie est douce et claire.,0.14285714285714285,0.029411764705882353,1,0,0
+fr_03,French,fr,singing,short,Fr-sing-3.m4a,Sa belle voix est douce et claire.,S'appellent fois et douce et claire,0.7142857142857143,0.2647058823529412,4,1,0
+fr_04,French,fr,speech,medium,Fr-speak-4.m4a,Cette chanson me rappelle toujours de vieux souvenirs.,Cette chanson me rappelle toujours de vieux souvenirs.,0.0,0.0,0,0,0
+fr_04,French,fr,singing,medium,Fr-sing-4.m4a,Cette chanson me rappelle toujours de vieux souvenirs.,Cette chanson me rappelle toujours de vieux souvenirs.,0.0,0.0,0,0,0
+fr_05,French,fr,speech,medium,Fr-speak-5.m4a,"Parfois, j'écoute de la musique avant de dormir.","Parfois, j'ai goutte la musique avant d'autant remir.",0.5,0.3333333333333333,4,0,0
+fr_05,French,fr,singing,medium,Fr-sing-5.m4a,"Parfois, j'écoute de la musique avant de dormir.",Parfois je goutte de la musique avant de dormir.,0.375,0.10416666666666667,2,0,1
+fr_06,French,fr,speech,medium,Fr-speak-6.m4a,Les vieux souvenirs reviennent quand j'entends cette chanson.,Les vues sont venus reviennent comme gens dans cette chanson.,0.75,0.32786885245901637,4,0,2
+fr_06,French,fr,singing,medium,Fr-sing-6.m4a,Les vieux souvenirs reviennent quand j'entends cette chanson.,L'Aïvresou n'y a rien qu'on chante à cette chanson.,0.875,0.45901639344262296,6,0,1
+fr_07,French,fr,speech,long,Fr-speak-7.m4a,Une mélodie calme peut rendre une soirée ordinaire spéciale.,Une mélodie galme peut rendre une soirée audinaire spéciale.,0.2222222222222222,0.05,2,0,0
+fr_07,French,fr,singing,long,Fr-sing-7.m4a,Une mélodie calme peut rendre une soirée ordinaire spéciale.,Une mèle d'hégalme beurre en haine soirée au dix dix spéciales,1.0,0.43333333333333335,7,0,2
+fr_08,French,fr,speech,long,Fr-speak-8.m4a,Apprendre une nouvelle langue demande du temps et de la patience.,Apprendre une nouvelle langue de m'entudant et de la patience.,0.2727272727272727,0.18461538461538463,2,1,0
+fr_08,French,fr,singing,long,Fr-sing-8.m4a,Apprendre une nouvelle langue demande du temps et de la patience.,Apprends une nouvelle longue demandue d'aller ta patience.,0.7272727272727273,0.26153846153846155,5,3,0
+fr_09,French,fr,speech,long,Fr-speak-9.m4a,"Parfois, une chanson simple peut changer complètement mon humeur.","Parfois, une chanson semble peut changer complètement mon humeur.",0.1111111111111111,0.03076923076923077,1,0,0
+fr_09,French,fr,singing,long,Fr-sing-9.m4a,"Parfois, une chanson simple peut changer complètement mon humeur.","Parfois, une chanson simple peut changer complètement, mon humeur.",0.1111111111111111,0.015384615384615385,1,0,0
