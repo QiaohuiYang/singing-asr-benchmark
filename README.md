@@ -10,7 +10,11 @@ This project investigates whether a pretrained ASR foundation model remains robu
 
 I use **Whisper** as a fixed pretrained ASR baseline and compare recognition performance on paired speech and singing recordings in **English and French**.
 
-### Research Question
+---
+
+## Research Question
+
+### Main Question
 
 **How robust is a pretrained ASR foundation model to the domain shift from speech to singing?**
 
@@ -31,7 +35,7 @@ Each sentence is recorded twice:
 - **Speech** — natural spoken reading
 - **Singing** — the same sentence sung using a simple melody
 
-This controls for linguistic content and allows the analysis to focus on the effect of singing.
+This paired design controls for linguistic content and allows the analysis to focus on the effect of singing.
 
 ### Dataset
 
@@ -59,9 +63,9 @@ To reduce unnecessary variation, the singing recordings use a simple melodic str
 
 ---
 
-## Method
+# Method
 
-### ASR Model
+## ASR Model
 
 The experiment uses **Whisper**, a pretrained multilingual speech recognition foundation model.
 
@@ -69,11 +73,11 @@ The model is used **without fine-tuning**. This allows the experiment to measure
 
 Inference is performed using [`faster-whisper`](https://github.com/SYSTRAN/faster-whisper).
 
-### Evaluation Metrics
+## Evaluation Metrics
 
 Recognition performance is evaluated using:
 
-**Word Error Rate (WER)**
+### Word Error Rate (WER)
 
 \[
 WER = \frac{S + D + I}{N}
@@ -86,9 +90,17 @@ where:
 - \(I\) = insertions
 - \(N\) = number of words in the reference
 
-**Character Error Rate (CER)** is also calculated.
+### Character Error Rate (CER)
 
-In addition, substitution, deletion, and insertion errors are analyzed separately.
+CER provides a character-level measure of recognition accuracy and complements WER.
+
+### Error Decomposition
+
+Recognition errors are additionally decomposed into:
+
+- Substitutions
+- Deletions
+- Insertions
 
 Because the experiment uses paired recordings, speech and singing WER/CER are compared using the **Wilcoxon signed-rank test**.
 
@@ -98,14 +110,14 @@ Because the experiment uses paired recordings, speech and singing WER/CER are co
 
 ## 1. Singing substantially degrades ASR performance
 
-Across 18 paired utterances:
+Across **18 paired utterances**:
 
 | Metric | Speech | Singing | Mean Δ |
 |---|---:|---:|---:|
 | WER | 0.134 | 0.408 | **+0.274** |
 | CER | 0.064 | 0.177 | **+0.112** |
 
-The paired Wilcoxon signed-rank test gives:
+The paired Wilcoxon signed-rank tests give:
 
 | Metric | p-value | Effect size \(r\) |
 |---|---:|---:|
@@ -118,13 +130,13 @@ These results provide evidence that singing substantially reduces recognition ac
 
 ![Paired WER](results/figures/fig1_paired_wer.png)
 
-Each row represents one paired utterance. The plot highlights the change from speech to singing at the utterance level.
+Each row represents one paired utterance. The figure highlights the change in WER from speech to singing.
 
 The magnitude of degradation varies considerably across utterances: some remain relatively robust, while others show severe increases in WER.
 
 ---
 
-## 2. Singing-related errors are dominated by substitutions
+## 2. Singing-related errors are primarily driven by substitutions
 
 After normalizing error counts by reference word count:
 
@@ -136,9 +148,11 @@ After normalizing error counts by reference word count:
 
 The largest increase occurs in **substitution errors**.
 
-This suggests that singing does not simply cause the ASR system to miss portions of the signal. Instead, the model frequently maps sung acoustic patterns to incorrect lexical hypotheses.
+The increase in substitutions is substantially larger than the increases in deletion and insertion rates.
 
-### Error Type Comparison
+This suggests that singing does not simply cause the ASR system to miss portions of the signal. Instead, the model frequently maps sung acoustic patterns to **incorrect lexical hypotheses**.
+
+### Normalized Error Types
 
 ![Error Types](results/figures/fig4_error_types.png)
 
@@ -150,7 +164,9 @@ This suggests that singing does not simply cause the ASR system to miss portions
 
 In this dataset, French shows higher WER than English in both speech and singing conditions.
 
-This is treated as an exploratory observation rather than a general claim about language difficulty because each language contains only nine paired utterances.
+The English and French datasets contain the same number of paired utterances, but the current sample is too small to make a general claim about language difficulty.
+
+Therefore, the language comparison is treated as an **exploratory analysis**.
 
 ---
 
@@ -166,53 +182,19 @@ Because each length group contains only six paired observations, this analysis i
 
 ---
 
-## 5. Acoustic exploratory analysis
-
-Acoustic features were extracted from the singing recordings to explore whether utterance-level variation in ASR degradation could be associated with measurable properties of the audio.
-
-The extracted features include:
-
-- Singing duration
-- Mean F0
-- F0 standard deviation
-- F0 range
-- RMS energy
-
-The Pearson correlations with singing-related WER degradation (\(\Delta WER\)) were:
-
-| Acoustic Feature | Pearson \(r\) |
-|---|---:|
-| Singing duration | 0.025 |
-| Mean F0 | 0.315 |
-| F0 standard deviation | -0.394 |
-| F0 range | -0.282 |
-| RMS | -0.059 |
-
-Singing duration and RMS showed little apparent association with ASR degradation.
-
-F0-related features showed potentially interesting associations, particularly F0 variability. However, these results are considered **exploratory** because of the small sample size and potential pitch-tracking noise.
-
-### Acoustic Plots
-
-![Duration vs ΔWER](results/figures/fig5_duration_vs_delta_wer.png)
-
-![Mean F0 vs ΔWER](results/figures/fig5_mean_f0_vs_delta_wer.png)
-
-![F0 variability vs ΔWER](results/figures/fig5_f0_std_vs_delta_wer.png)
-
-![F0 range vs ΔWER](results/figures/fig5_f0_range_vs_delta_wer.png)
-
-![RMS vs ΔWER](results/figures/fig5_rms_vs_delta_wer.png)
-
----
-
 # Qualitative Error Analysis
 
-Quantitative metrics show that singing increases ASR error, but individual transcription examples reveal how the model fails.
+Quantitative metrics show that singing increases ASR error, but individual transcription examples provide additional insight into how the model fails.
 
-### Local Lexical Substitution
+## English Examples
+
+### 1. Local lexical substitution
 
 **Reference**
+
+> The morning feels warm and bright.
+
+**Speech prediction**
 
 > The morning feels warm and bright.
 
@@ -220,15 +202,21 @@ Quantitative metrics show that singing increases ASR error, but individual trans
 
 > The morning feels woman bright.
 
-Here the model preserves most of the sentence but substitutes a locally similar lexical item:
+The singing condition introduces a localized lexical substitution:
 
 `warm → woman`
 
+Most of the utterance remains correct, but a single lexical substitution increases WER.
+
 ---
 
-### Severe Phrase-Level Distortion
+### 2. Severe phrase-level distortion
 
 **Reference**
+
+> A quiet melody can make an ordinary evening feel special.
+
+**Speech prediction**
 
 > A quiet melody can make an ordinary evening feel special.
 
@@ -236,131 +224,101 @@ Here the model preserves most of the sentence but substitutes a locally similar 
 
 > "Ah, quiet melody can't make it Hold on to the rain evening few special"
 
-The corresponding speech recording is transcribed correctly, while the singing version shows substantial phrase-level distortion.
+The speech recording is transcribed correctly, whereas the singing recording exhibits substantial phrase-level distortion.
+
+Interestingly, the output still consists largely of plausible English words rather than completely unintelligible noise. This suggests that the model may map the sung acoustic signal to an incorrect but locally plausible lexical sequence.
 
 ---
 
-### Singing Does Not Always Cause Failure
+### 3. Singing does not always cause failure
 
 **Reference**
 
 > Learning a new language takes time and patience.
 
-Both the speech and singing recordings are transcribed correctly.
+**Speech prediction**
 
-This indicates that singing-related degradation is **heterogeneous rather than deterministic**.
+> Learning a new language takes time and patience.
 
----
+**Singing prediction**
 
-### Occasional Improvement Under Singing
+> Learning a new language takes time and patience.
 
-For `fr_05`, the singing transcription is actually closer to the reference than the speech transcription.
+Both conditions are transcribed correctly.
 
-This further suggests that singing increases error risk on average but does not necessarily worsen every individual utterance.
-
----
-
-# Key Findings
-
-### 1. Singing substantially reduces ASR accuracy
-
-WER increased from **0.134 to 0.408**, while CER increased from **0.064 to 0.177**.
-
-### 2. The degradation is primarily driven by substitutions
-
-Normalized substitution error rate increased from **0.115 to 0.296**, substantially more than deletion or insertion rates.
-
-### 3. Singing-related degradation is heterogeneous
-
-Some utterances remain correctly recognized under singing, while others exhibit severe phrase-level distortion.
-
-### 4. Language and utterance characteristics may contribute
-
-French showed higher WER than English in this dataset, while sentence length did not produce a simple monotonic pattern.
-
-### 5. Acoustic correlates remain exploratory
-
-Duration and RMS showed little apparent relationship with degradation. F0-related measures may warrant further investigation.
+This demonstrates that singing-related degradation is **heterogeneous rather than deterministic**.
 
 ---
 
-# Limitations
+## French Examples
 
-This is a small-scale exploratory study with several limitations.
+### 1. Local lexical and phonetic distortion
 
-### Small Sample Size
+**Reference**
 
-The benchmark contains only **18 paired utterances**. The results should therefore be interpreted as findings within this dataset rather than population-level conclusions.
+> Le matin est doux et lumineux.
 
-### Single Speaker
+**Speech prediction**
 
-All recordings were produced by one speaker, so speaker-specific characteristics may influence the results.
+> Le matin est tout et lumineux.
 
-### Limited Linguistic Coverage
+**Singing prediction**
 
-Only English and French are included, with a small number of sentences per language.
+> Le matin est tout élimineux.
 
-### Single ASR Model
-
-The current study evaluates Whisper only. It therefore does not determine whether the observed singing-related degradation generalizes to other pretrained ASR architectures.
-
-### Acoustic Feature Reliability
-
-Pitch-based features are estimated automatically and may contain errors, particularly in sung audio.
+The spoken version contains a localized lexical substitution, while the singing version introduces additional phonetic and lexical distortion.
 
 ---
 
-# Future Work
+### 2. Severe phrase-level distortion
 
-Potential extensions include:
+**Reference**
 
-- Evaluate additional pretrained ASR models.
-- Expand the benchmark to multiple speakers.
-- Add more languages and singing styles.
-- Test different melodic contours and pitch ranges.
-- Improve F0 extraction and pitch-related analysis.
-- Investigate whether ASR adaptation or fine-tuning can reduce singing-related degradation.
-- Extend the analysis to singing-specific tasks such as lyric transcription and lyrics-to-audio alignment.
+> Une mélodie calme peut rendre une soirée ordinaire spéciale.
+
+**Speech prediction**
+
+> Une mélodie galme peut rendre une soirée audinaire spéciale.
+
+**Singing prediction**
+
+> Une mèle d'hégalme beurre en haine soirée au dix dix spéciales
+
+The singing condition produces substantial phrase-level distortion, while the speech condition contains only localized errors.
+
+This provides a qualitatively similar failure pattern to the severe English example, suggesting that singing-related recognition errors are not restricted to a single language.
 
 ---
 
-# Project Structure
+### 3. Singing can occasionally outperform speech
 
-```text
-singing-asr-benchmark/
-│
-├── data/
-│   ├── audio/
-│   │   ├── en/
-│   │   └── fr/
-│   └── metadata_ground_truth.csv
-│
-├── results/
-│   ├── figures/
-│   │   ├── fig1_paired_wer.png
-│   │   ├── fig2_wer_language.png
-│   │   ├── fig3_delta_wer_length.png
-│   │   ├── fig4_error_types.png
-│   │   ├── fig5_duration_vs_delta_wer.png
-│   │   ├── fig5_mean_f0_vs_delta_wer.png
-│   │   ├── fig5_f0_std_vs_delta_wer.png
-│   │   ├── fig5_f0_range_vs_delta_wer.png
-│   │   └── fig5_rms_vs_delta_wer.png
-│   │
-│   ├── transcriptions.csv
-│   ├── metrics.csv
-│   ├── summary_by_condition.csv
-│   ├── acoustic_features.csv
-│   ├── final_analysis.csv
-│   ├── overall_summary.csv
-│   ├── statistical_tests.csv
-│   ├── normalized_error_rates.csv
-│   └── acoustic_correlations.csv
-│
-├── run_whisper.py
-├── evaluate.py
-├── extract_features.py
-├── analyze_data.py
-├── analyze_results.py
-├── README.md
-└── .gitignore
+**Reference**
+
+> Parfois, j'écoute de la musique avant de dormir.
+
+**Speech prediction**
+
+> Parfois, j'ai goutte la musique avant d'autant remir.
+
+**Singing prediction**
+
+> Parfois je goutte de la musique avant de dormir.
+
+In this case, the singing transcription is actually closer to the reference than the speech transcription.
+
+This provides an important counterexample to the overall degradation trend and reinforces the observation that singing-related ASR degradation varies substantially across utterances.
+
+---
+
+## Summary of Qualitative Patterns
+
+The examples above illustrate four recurring patterns:
+
+1. **Localized substitutions** — a small number of words are replaced by acoustically similar alternatives.
+2. **Phrase-level distortion** — singing can produce much larger deviations from the reference.
+3. **Cross-language consistency** — similar failure patterns appear in both English and French.
+4. **Heterogeneous effects** — some sung utterances remain correct, and occasional cases even outperform speech.
+
+---
+
+#
