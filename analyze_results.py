@@ -1,13 +1,41 @@
+"""
+Final analysis pipeline for the Singing ASR Benchmark.
+
+This script:
+1. Loads the paired analysis table.
+2. Computes descriptive statistics.
+3. Performs paired Wilcoxon signed-rank tests.
+4. Generates result figures.
+5. Performs exploratory acoustic correlation analysis.
+6. Saves analysis summaries for reproducibility.
+
+Input:
+    results/final_analysis.csv
+    results/metrics.csv
+    data/metadata_ground_truth.csv
+
+Outputs:
+    results/overall_summary.csv
+    results/statistical_tests.csv
+    results/normalized_error_rates.csv
+    results/acoustic_correlations.csv
+    results/analysis_summary.txt
+    results/figures/*.png
+
+Usage:
+    python analyze_results.py
+"""
+
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 from scipy.stats import wilcoxon
 
 
 # ============================================================
-# 1. Paths
+# Configuration
 # ============================================================
 
 PROJECT_ROOT = Path(__file__).resolve().parent
@@ -15,154 +43,222 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 RESULTS_DIR = PROJECT_ROOT / "results"
 FIGURES_DIR = RESULTS_DIR / "figures"
 
-RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-FIGURES_DIR.mkdir(parents=True, exist_ok=True)
+FINAL_ANALYSIS_FILE = (
+    RESULTS_DIR / "final_analysis.csv"
+)
 
-FINAL_ANALYSIS = RESULTS_DIR / "final_analysis.csv"
-METRICS_FILE = RESULTS_DIR / "metrics.csv"
-METADATA_FILE = PROJECT_ROOT / "data" / "metadata_ground_truth.csv"
+METRICS_FILE = (
+    RESULTS_DIR / "metrics.csv"
+)
+
+METADATA_FILE = (
+    PROJECT_ROOT
+    / "data"
+    / "metadata_ground_truth.csv"
+)
+
+OVERALL_SUMMARY_FILE = (
+    RESULTS_DIR / "overall_summary.csv"
+)
+
+STATISTICS_FILE = (
+    RESULTS_DIR / "statistical_tests.csv"
+)
+
+NORMALIZED_ERRORS_FILE = (
+    RESULTS_DIR / "normalized_error_rates.csv"
+)
+
+ACOUSTIC_CORRELATIONS_FILE = (
+    RESULTS_DIR / "acoustic_correlations.csv"
+)
+
+ANALYSIS_SUMMARY_FILE = (
+    RESULTS_DIR / "analysis_summary.txt"
+)
 
 
 # ============================================================
-# 2. Load data
+# Required columns
 # ============================================================
 
-print("=" * 60)
-print("Loading data...")
-print("=" * 60)
-
-if not FINAL_ANALYSIS.exists():
-    raise FileNotFoundError(
-        f"Cannot find:\n{FINAL_ANALYSIS}\n\n"
-        "Please make sure final_analysis.csv is inside results/."
-    )
-
-df = pd.read_csv(FINAL_ANALYSIS)
-
-print(f"Final analysis rows: {len(df)}")
-print("\nColumns:")
-print(df.columns.tolist())
-
-
-# ============================================================
-# 3. Required columns
-# ============================================================
-
-required_columns = [
+REQUIRED_COLUMNS = [
     "utterance_id",
     "language",
     "length_group",
+
     "WER_speech",
     "WER_singing",
     "CER_speech",
     "CER_singing",
+
     "delta_WER",
     "delta_CER",
 ]
 
-missing = [c for c in required_columns if c not in df.columns]
 
-if missing:
-    raise ValueError(
-        "\nMissing required columns:\n"
-        + "\n".join(missing)
+# ============================================================
+# Data loading and validation
+# ============================================================
+
+def load_final_analysis() -> pd.DataFrame:
+    """Load and validate the final paired analysis table."""
+
+    if not FINAL_ANALYSIS_FILE.exists():
+        raise FileNotFoundError(
+            f"Cannot find:\n{FINAL_ANALYSIS_FILE}\n\n"
+            "Please run analyze_data.py first."
+        )
+
+    df = pd.read_csv(
+        FINAL_ANALYSIS_FILE
+    )
+
+    missing = [
+        column
+        for column in REQUIRED_COLUMNS
+        if column not in df.columns
+    ]
+
+    if missing:
+        raise ValueError(
+            "Missing required columns in final_analysis.csv:\n"
+            + "\n".join(missing)
+        )
+
+    return df
+
+
+def standardize_categories(
+    df: pd.DataFrame,
+) -> pd.DataFrame:
+    """Create normalized language and length labels."""
+
+    df = df.copy()
+
+    df["language_clean"] = (
+        df["language"]
+        .astype(str)
+        .str.strip()
+        .str.lower()
+    )
+
+    df["length_clean"] = (
+        df["length_group"]
+        .astype(str)
+        .str.strip()
+        .str.lower()
+    )
+
+    return df
+
+
+# ============================================================
+# Overall descriptive statistics
+# ============================================================
+
+def calculate_overall_summary(
+    df: pd.DataFrame,
+) -> pd.DataFrame:
+    """Calculate overall speech-vs-singing descriptive statistics."""
+
+    summary_rows = []
+
+    metric_specs = [
+        (
+            "WER",
+            "WER_speech",
+            "WER_singing",
+            "delta_WER",
+        ),
+        (
+            "CER",
+            "CER_speech",
+            "CER_singing",
+            "delta_CER",
+        ),
+    ]
+
+    for (
+        metric_name,
+        speech_col,
+        singing_col,
+        delta_col,
+    ) in metric_specs:
+
+        summary_rows.append({
+            "metric": metric_name,
+            "n_pairs": len(df),
+
+            "speech_mean":
+                df[speech_col].mean(),
+
+            "singing_mean":
+                df[singing_col].mean(),
+
+            "mean_delta":
+                df[delta_col].mean(),
+
+            "speech_median":
+                df[speech_col].median(),
+
+            "singing_median":
+                df[singing_col].median(),
+
+            "median_delta":
+                df[delta_col].median(),
+
+            "speech_std":
+                df[speech_col].std(),
+
+            "singing_std":
+                df[singing_col].std(),
+        })
+
+    return pd.DataFrame(
+        summary_rows
     )
 
 
 # ============================================================
-# 4. Standardize categorical values
+# Wilcoxon signed-rank tests
 # ============================================================
 
-df["language_clean"] = (
-    df["language"]
-    .astype(str)
-    .str.strip()
-    .str.lower()
-)
-
-df["length_clean"] = (
-    df["length_group"]
-    .astype(str)
-    .str.strip()
-    .str.lower()
-)
-
-
-# ============================================================
-# 5. Derived variables
-# ============================================================
-
-df["delta_WER"] = (
-    df["WER_singing"] - df["WER_speech"]
-)
-
-df["delta_CER"] = (
-    df["CER_singing"] - df["CER_speech"]
-)
-
-
-# ============================================================
-# 6. Overall summary
-# ============================================================
-
-summary_rows = []
-
-for metric_name, speech_col, singing_col, delta_col in [
-    ("WER", "WER_speech", "WER_singing", "delta_WER"),
-    ("CER", "CER_speech", "CER_singing", "delta_CER"),
-]:
-
-    summary_rows.append({
-        "metric": metric_name,
-        "n_pairs": len(df),
-
-        "speech_mean": df[speech_col].mean(),
-        "singing_mean": df[singing_col].mean(),
-        "mean_delta": df[delta_col].mean(),
-
-        "speech_median": df[speech_col].median(),
-        "singing_median": df[singing_col].median(),
-        "median_delta": df[delta_col].median(),
-
-        "speech_std": df[speech_col].std(),
-        "singing_std": df[singing_col].std(),
-    })
-
-summary_df = pd.DataFrame(summary_rows)
-
-summary_file = RESULTS_DIR / "overall_summary.csv"
-summary_df.to_csv(summary_file, index=False)
-
-print("\nOverall summary:")
-print(summary_df.round(4))
-
-
-# ============================================================
-# 7. Wilcoxon signed-rank tests
-# ============================================================
-
-def wilcoxon_report(speech, singing):
+def wilcoxon_report(
+    speech: pd.Series,
+    singing: pd.Series,
+) -> dict:
     """
-    Paired Wilcoxon signed-rank test.
+    Perform a paired Wilcoxon signed-rank test.
 
-    Returns:
-        n_pairs
-        n_nonzero
-        statistic
-        p_value
-        effect_r
+    The effect_r value is an approximate rank-based effect
+    size derived from the Wilcoxon statistic.
     """
 
-    speech = np.asarray(speech, dtype=float)
-    singing = np.asarray(singing, dtype=float)
+    speech = np.asarray(
+        speech,
+        dtype=float,
+    )
 
-    diff = singing - speech
+    singing = np.asarray(
+        singing,
+        dtype=float,
+    )
 
-    nonzero_diff = diff[diff != 0]
+    differences = (
+        singing - speech
+    )
 
-    if len(nonzero_diff) == 0:
+    nonzero_differences = (
+        differences[
+            differences != 0
+        ]
+    )
+
+    if len(nonzero_differences) == 0:
+
         return {
-            "n_pairs": len(diff),
+            "n_pairs": len(differences),
             "n_nonzero": 0,
             "statistic": np.nan,
             "p_value": 1.0,
@@ -177,23 +273,37 @@ def wilcoxon_report(speech, singing):
         method="auto",
     )
 
-    n = len(nonzero_diff)
+    n = len(nonzero_differences)
 
-    mean_w = n * (n + 1) / 4
+    # Expected Wilcoxon statistic under H0
+    mean_w = (
+        n * (n + 1) / 4
+    )
+
     sd_w = np.sqrt(
-        n * (n + 1) * (2 * n + 1) / 24
+        n
+        * (n + 1)
+        * (2 * n + 1)
+        / 24
     )
 
-    z = (
-        (result.statistic - mean_w) / sd_w
-        if sd_w > 0
-        else 0
-    )
+    if sd_w > 0:
 
-    effect_r = abs(z) / np.sqrt(n)
+        z = (
+            result.statistic
+            - mean_w
+        ) / sd_w
+
+    else:
+
+        z = 0.0
+
+    effect_r = (
+        abs(z) / np.sqrt(n)
+    )
 
     return {
-        "n_pairs": len(diff),
+        "n_pairs": len(differences),
         "n_nonzero": n,
         "statistic": result.statistic,
         "p_value": result.pvalue,
@@ -201,614 +311,668 @@ def wilcoxon_report(speech, singing):
     }
 
 
-stat_rows = []
+def calculate_statistical_tests(
+    df: pd.DataFrame,
+) -> pd.DataFrame:
+    """Run paired Wilcoxon tests for WER and CER."""
 
-for metric_name, speech_col, singing_col in [
-    ("WER", "WER_speech", "WER_singing"),
-    ("CER", "CER_speech", "CER_singing"),
-]:
+    rows = []
 
-    result = wilcoxon_report(
-        df[speech_col],
-        df[singing_col],
-    )
-
-    stat_rows.append({
-        "metric": metric_name,
-        **result,
-    })
-
-stats_df = pd.DataFrame(stat_rows)
-
-stats_file = RESULTS_DIR / "statistical_tests.csv"
-stats_df.to_csv(stats_file, index=False)
-
-print("\nWilcoxon signed-rank tests:")
-print(stats_df.round(4))
-
-
-# ============================================================
-# ============================================================
-# 8. Figure 1
-# Ranked paired WER (Dumbbell Plot)
-# ============================================================
-
-print("\nCreating Figure 1...")
-
-# Sort utterances by singing-related degradation
-plot_df = df.sort_values(
-    "delta_WER",
-    ascending=True
-).copy()
-
-# Create readable labels
-plot_df["label"] = (
-    plot_df["language_clean"].str[:2].str.upper()
-    + "_"
-    + plot_df["utterance_id"].astype(str)
-)
-
-# Reverse order so the largest degradation is at the top
-plot_df = plot_df.reset_index(drop=True)
-
-y_positions = np.arange(len(plot_df))
-
-plt.figure(figsize=(10, 9))
-
-# ------------------------------------------------------------
-# Draw connecting lines
-# ------------------------------------------------------------
-
-for y, (_, row) in zip(
-    y_positions,
-    plot_df.iterrows()
-):
-
-    plt.plot(
-        [
-            row["WER_speech"],
-            row["WER_singing"],
-        ],
-        [y, y],
-        linewidth=1.5,
-        alpha=0.45,
-    )
-
-# ------------------------------------------------------------
-# Plot speech points
-# ------------------------------------------------------------
-
-plt.scatter(
-    plot_df["WER_speech"],
-    y_positions,
-    s=65,
-    marker="o",
-    label="Speech",
-    zorder=3,
-)
-
-# ------------------------------------------------------------
-# Plot singing points
-# ------------------------------------------------------------
-
-plt.scatter(
-    plot_df["WER_singing"],
-    y_positions,
-    s=75,
-    marker="D",
-    label="Singing",
-    zorder=3,
-)
-
-# ------------------------------------------------------------
-# Add zero-degradation reference conceptually
-# ------------------------------------------------------------
-
-plt.yticks(
-    y_positions,
-    plot_df["label"],
-    fontsize=9,
-)
-
-plt.xlabel(
-    "Word Error Rate (WER)",
-    fontsize=12,
-)
-
-plt.ylabel(
-    "Utterance",
-    fontsize=12,
-)
-
-plt.title(
-    "Paired WER Change from Speech to Singing",
-    fontsize=15,
-)
-
-plt.grid(
-    axis="x",
-    alpha=0.25,
-)
-
-plt.legend(
-    frameon=True,
-)
-
-plt.tight_layout()
-
-fig1 = FIGURES_DIR / "fig1_paired_wer.png"
-
-plt.savefig(
-    fig1,
-    dpi=300,
-    bbox_inches="tight",
-)
-
-plt.close()
-
-print(f"Saved: {fig1}")
-
-
-# ============================================================
-# 9. Figure 2
-# WER by Language and Mode
-# ============================================================
-
-print("\nCreating Figure 2...")
-
-languages = ["english", "french"]
-
-speech_data = []
-singing_data = []
-
-for language in languages:
-
-    subset = df[
-        df["language_clean"] == language
+    metric_specs = [
+        (
+            "WER",
+            "WER_speech",
+            "WER_singing",
+        ),
+        (
+            "CER",
+            "CER_speech",
+            "CER_singing",
+        ),
     ]
 
-    speech_data.append(
-        subset["WER_speech"].dropna().values
-    )
+    for (
+        metric_name,
+        speech_col,
+        singing_col,
+    ) in metric_specs:
 
-    singing_data.append(
-        subset["WER_singing"].dropna().values
-    )
+        result = wilcoxon_report(
+            df[speech_col],
+            df[singing_col],
+        )
 
+        rows.append({
+            "metric": metric_name,
+            **result,
+        })
 
-positions = [
-    1,
-    2,
-    4,
-    5,
-]
-
-data_for_boxplot = [
-    speech_data[0],
-    singing_data[0],
-    speech_data[1],
-    singing_data[1],
-]
-
-labels = [
-    "English\nSpeech",
-    "English\nSinging",
-    "French\nSpeech",
-    "French\nSinging",
-]
-
-plt.figure(figsize=(9, 6))
-
-plt.boxplot(
-    data_for_boxplot,
-    positions=positions,
-    widths=0.55,
-    patch_artist=False,
-    showfliers=True,
-)
-
-plt.xticks(
-    positions,
-    labels,
-    fontsize=11,
-)
-
-plt.ylabel(
-    "Word Error Rate (WER)",
-    fontsize=12,
-)
-
-plt.title(
-    "WER by Language and Mode",
-    fontsize=15,
-)
-
-plt.grid(
-    axis="y",
-    alpha=0.25,
-)
-
-plt.xlim(0.4, 5.6)
-
-plt.tight_layout()
-
-fig2 = FIGURES_DIR / "fig2_wer_language.png"
-
-plt.savefig(
-    fig2,
-    dpi=300,
-    bbox_inches="tight",
-)
-
-plt.close()
-
-print(f"Saved: {fig2}")
+    return pd.DataFrame(rows)
 
 
 # ============================================================
-# 10. Figure 3
-# ΔWER by Sentence Length
-# Individual points + median
+# Figure 1: Paired WER
 # ============================================================
 
-print("\nCreating Figure 3...")
+def plot_paired_wer(
+    df: pd.DataFrame,
+) -> None:
+    """Create a ranked paired WER dumbbell plot."""
 
-length_order = [
-    "short",
-    "medium",
-    "long",
-]
-
-length_labels = [
-    "Short",
-    "Medium",
-    "Long",
-]
-
-plt.figure(figsize=(8, 6))
-
-for x, length_group in enumerate(
-    length_order,
-    start=1,
-):
-
-    values = df[
-        df["length_clean"] == length_group
-    ]["delta_WER"].dropna().values
-
-    # Small horizontal jitter
-    jitter = np.linspace(
-        -0.10,
-        0.10,
-        len(values),
+    plot_df = (
+        df.sort_values(
+            "delta_WER",
+            ascending=True,
+        )
+        .copy()
+        .reset_index(drop=True)
     )
+
+    y_positions = np.arange(
+        len(plot_df)
+    )
+
+    plt.figure(
+        figsize=(10, 9)
+    )
+
+    # --------------------------------------------------------
+    # Connecting lines
+    # --------------------------------------------------------
+
+    for y, (_, row) in zip(
+        y_positions,
+        plot_df.iterrows(),
+    ):
+
+        plt.plot(
+            [
+                row["WER_speech"],
+                row["WER_singing"],
+            ],
+            [
+                y,
+                y,
+            ],
+            linewidth=1.5,
+            alpha=0.45,
+        )
+
+    # --------------------------------------------------------
+    # Speech
+    # --------------------------------------------------------
 
     plt.scatter(
-        x + jitter,
-        values,
-        s=55,
-        alpha=0.75,
+        plot_df["WER_speech"],
+        y_positions,
+        s=65,
+        marker="o",
+        label="Speech",
+        zorder=3,
     )
 
-    # Median
-    median_value = np.median(values)
+    # --------------------------------------------------------
+    # Singing
+    # --------------------------------------------------------
 
-    plt.plot(
-        [x - 0.18, x + 0.18],
-        [median_value, median_value],
-        linewidth=3,
+    plt.scatter(
+        plot_df["WER_singing"],
+        y_positions,
+        s=75,
+        marker="D",
+        label="Singing",
+        zorder=3,
     )
 
-plt.axhline(
-    0,
-    linewidth=1,
-    alpha=0.7,
-)
+    # --------------------------------------------------------
+    # Labels
+    # --------------------------------------------------------
 
-plt.xticks(
-    [1, 2, 3],
-    length_labels,
-    fontsize=12,
-)
+    plt.yticks(
+        y_positions,
+        plot_df["utterance_id"],
+        fontsize=9,
+    )
 
-plt.xlabel(
-    "Sentence Length",
-    fontsize=12,
-)
+    plt.xlabel(
+        "Word Error Rate (WER)",
+        fontsize=12,
+    )
 
-plt.ylabel(
-    "ΔWER (Singing − Speech)",
-    fontsize=12,
-)
+    plt.ylabel(
+        "Utterance",
+        fontsize=12,
+    )
 
-plt.title(
-    "ASR Degradation by Sentence Length",
-    fontsize=15,
-)
+    plt.title(
+        "Paired WER Change from Speech to Singing",
+        fontsize=15,
+    )
 
-plt.grid(
-    axis="y",
-    alpha=0.25,
-)
+    plt.grid(
+        axis="x",
+        alpha=0.25,
+    )
 
-plt.tight_layout()
+    plt.legend(
+        frameon=True,
+    )
 
-fig3 = FIGURES_DIR / "fig3_delta_wer_length.png"
+    plt.tight_layout()
 
-plt.savefig(
-    fig3,
-    dpi=300,
-    bbox_inches="tight",
-)
+    output_file = (
+        FIGURES_DIR
+        / "fig1_paired_wer.png"
+    )
 
-plt.close()
+    plt.savefig(
+        output_file,
+        dpi=300,
+        bbox_inches="tight",
+    )
 
-print(f"Saved: {fig3}")
+    plt.close()
+
+    print(
+        f"Saved: {output_file}"
+    )
 
 
 # ============================================================
-# 11. Figure 4
-# Normalized Error Types
+# Figure 2: WER by language
 # ============================================================
 
-print("\nCreating Figure 4...")
+def plot_wer_by_language(
+    df: pd.DataFrame,
+) -> None:
+    """Create WER comparison across languages and modes."""
 
-if METRICS_FILE.exists():
+    languages = [
+        "english",
+        "french",
+    ]
 
-    metrics = pd.read_csv(METRICS_FILE)
+    data = []
+    positions = []
+    labels = []
 
-    print("\nMetrics columns:")
-    print(metrics.columns.tolist())
+    position = 1
 
-    required_error_cols = [
+    for language in languages:
+
+        subset = df[
+            df["language_clean"]
+            == language
+        ]
+
+        speech_values = (
+            subset["WER_speech"]
+            .dropna()
+            .values
+        )
+
+        singing_values = (
+            subset["WER_singing"]
+            .dropna()
+            .values
+        )
+
+        if len(speech_values) == 0:
+            continue
+
+        data.extend([
+            speech_values,
+            singing_values,
+        ])
+
+        positions.extend([
+            position,
+            position + 1,
+        ])
+
+        language_label = (
+            language.capitalize()
+        )
+
+        labels.extend([
+            f"{language_label}\nSpeech",
+            f"{language_label}\nSinging",
+        ])
+
+        position += 3
+
+    if not data:
+        print(
+            "Warning: no language data available."
+        )
+        return
+
+    plt.figure(
+        figsize=(9, 6)
+    )
+
+    plt.boxplot(
+        data,
+        positions=positions,
+        widths=0.55,
+        patch_artist=False,
+        showfliers=True,
+    )
+
+    plt.xticks(
+        positions,
+        labels,
+        fontsize=11,
+    )
+
+    plt.ylabel(
+        "Word Error Rate (WER)",
+        fontsize=12,
+    )
+
+    plt.title(
+        "WER by Language and Mode",
+        fontsize=15,
+    )
+
+    plt.grid(
+        axis="y",
+        alpha=0.25,
+    )
+
+    plt.xlim(
+        0.4,
+        max(positions) + 0.6,
+    )
+
+    plt.tight_layout()
+
+    output_file = (
+        FIGURES_DIR
+        / "fig2_wer_language.png"
+    )
+
+    plt.savefig(
+        output_file,
+        dpi=300,
+        bbox_inches="tight",
+    )
+
+    plt.close()
+
+    print(
+        f"Saved: {output_file}"
+    )
+
+
+# ============================================================
+# Figure 3: ΔWER by sentence length
+# ============================================================
+
+def plot_delta_wer_by_length(
+    df: pd.DataFrame,
+) -> None:
+    """Create an individual-point plot of ΔWER by sentence length."""
+
+    length_order = [
+        "short",
+        "medium",
+        "long",
+    ]
+
+    length_labels = [
+        "Short",
+        "Medium",
+        "Long",
+    ]
+
+    plt.figure(
+        figsize=(8, 6)
+    )
+
+    for x, length_group in enumerate(
+        length_order,
+        start=1,
+    ):
+
+        values = (
+            df[
+                df["length_clean"]
+                == length_group
+            ]["delta_WER"]
+            .dropna()
+            .values
+        )
+
+        if len(values) == 0:
+            continue
+
+        # Horizontal jitter
+        jitter = np.linspace(
+            -0.10,
+            0.10,
+            len(values),
+        )
+
+        plt.scatter(
+            x + jitter,
+            values,
+            s=55,
+            alpha=0.75,
+        )
+
+        # Median marker
+        median_value = (
+            np.median(values)
+        )
+
+        plt.plot(
+            [
+                x - 0.18,
+                x + 0.18,
+            ],
+            [
+                median_value,
+                median_value,
+            ],
+            linewidth=3,
+        )
+
+    plt.axhline(
+        0,
+        linewidth=1,
+        alpha=0.7,
+    )
+
+    plt.xticks(
+        [1, 2, 3],
+        length_labels,
+        fontsize=12,
+    )
+
+    plt.xlabel(
+        "Sentence Length",
+        fontsize=12,
+    )
+
+    plt.ylabel(
+        "ΔWER (Singing − Speech)",
+        fontsize=12,
+    )
+
+    plt.title(
+        "ASR Degradation by Sentence Length",
+        fontsize=15,
+    )
+
+    plt.grid(
+        axis="y",
+        alpha=0.25,
+    )
+
+    plt.tight_layout()
+
+    output_file = (
+        FIGURES_DIR
+        / "fig3_delta_wer_length.png"
+    )
+
+    plt.savefig(
+        output_file,
+        dpi=300,
+        bbox_inches="tight",
+    )
+
+    plt.close()
+
+    print(
+        f"Saved: {output_file}"
+    )
+
+
+# ============================================================
+# Figure 4: Normalized error types
+# ============================================================
+
+def calculate_normalized_error_rates(
+    metrics: pd.DataFrame,
+) -> pd.DataFrame:
+    """
+    Calculate mean error rates normalized by reference word count.
+    """
+
+    required_columns = [
+        "utterance_id",
+        "mode",
         "substitutions",
         "deletions",
         "insertions",
-        "mode",
     ]
 
-    if all(
-        col in metrics.columns
-        for col in required_error_cols
-    ):
+    missing = [
+        column
+        for column in required_columns
+        if column not in metrics.columns
+    ]
 
-        # ----------------------------------------------------
-        # Get reference word counts
-        # ----------------------------------------------------
-
-        reference_lengths = None
-
-        # Preferred method: use an existing reference length
-        possible_length_cols = [
-            "reference_length",
-            "ref_length",
-            "reference_words",
-            "ref_words",
-        ]
-
-        for col in possible_length_cols:
-
-            if col in metrics.columns:
-                reference_lengths = (
-                    metrics[
-                        ["utterance_id", col]
-                    ]
-                    .drop_duplicates(
-                        "utterance_id"
-                    )
-                    .rename(
-                        columns={
-                            col: "reference_length"
-                        }
-                    )
-                )
-                break
-
-        # Otherwise calculate from metadata
-        if reference_lengths is None:
-
-            if not METADATA_FILE.exists():
-
-                raise FileNotFoundError(
-                    "Could not find metadata_ground_truth.csv "
-                    "for reference word counts."
-                )
-
-            metadata = pd.read_csv(
-                METADATA_FILE
-            )
-
-            if (
-                "utterance_id" not in metadata.columns
-                or "reference" not in metadata.columns
-            ):
-                raise ValueError(
-                    "metadata_ground_truth.csv must contain "
-                    "'utterance_id' and 'reference'."
-                )
-
-            metadata["reference_length"] = (
-                metadata["reference"]
-                .astype(str)
-                .str.split()
-                .str.len()
-            )
-
-            reference_lengths = (
-                metadata[
-                    [
-                        "utterance_id",
-                        "reference_length",
-                    ]
-                ]
-                .drop_duplicates(
-                    "utterance_id"
-                )
-            )
-
-        # ----------------------------------------------------
-        # Merge word counts
-        # ----------------------------------------------------
-
-        metrics = metrics.merge(
-            reference_lengths,
-            on="utterance_id",
-            how="left",
+    if missing:
+        raise ValueError(
+            "Missing columns in metrics.csv:\n"
+            + "\n".join(missing)
         )
 
-        if metrics["reference_length"].isna().any():
+    # --------------------------------------------------------
+    # Obtain reference lengths
+    # --------------------------------------------------------
 
-            raise ValueError(
-                "Some recordings are missing reference word counts."
-            )
-
-        # ----------------------------------------------------
-        # Normalize each error type
-        # ----------------------------------------------------
-
-        error_types = [
-            "substitutions",
-            "deletions",
-            "insertions",
-        ]
-
-        for error_type in error_types:
-
-            metrics[
-                f"{error_type}_rate"
-            ] = (
-                metrics[error_type]
-                / metrics["reference_length"]
-            )
-
-        # ----------------------------------------------------
-        # Average error rate by mode
-        # ----------------------------------------------------
-
-        error_rate_summary = (
-            metrics.groupby("mode")[
-                [
-                    "substitutions_rate",
-                    "deletions_rate",
-                    "insertions_rate",
-                ]
-            ]
-            .mean()
+    if not METADATA_FILE.exists():
+        raise FileNotFoundError(
+            f"Metadata file not found:\n"
+            f"{METADATA_FILE}"
         )
 
-        error_rate_summary = error_rate_summary.reindex(
-            ["speech", "singing"]
-        )
-
-        # Save normalized summary
-        error_rate_summary.to_csv(
-            RESULTS_DIR / "normalized_error_rates.csv"
-        )
-
-        # ----------------------------------------------------
-        # Plot
-        # ----------------------------------------------------
-
-        ax = error_rate_summary.T.plot(
-            kind="bar",
-            figsize=(8, 6),
-        )
-
-        ax.set_xlabel(
-            "Error Type",
-            fontsize=12,
-        )
-
-        ax.set_ylabel(
-            "Mean Error Rate per Reference Word",
-            fontsize=12,
-        )
-
-        ax.set_title(
-            "Normalized ASR Error Types: Speech vs Singing",
-            fontsize=15,
-        )
-
-        ax.set_xticklabels(
-            [
-                "Substitutions",
-                "Deletions",
-                "Insertions",
-            ],
-            rotation=0,
-        )
-
-        ax.grid(
-            axis="y",
-            alpha=0.25,
-        )
-
-        plt.legend(
-            title="Mode"
-        )
-
-        plt.tight_layout()
-
-        fig4 = FIGURES_DIR / "fig4_error_types.png"
-
-        plt.savefig(
-            fig4,
-            dpi=300,
-            bbox_inches="tight",
-        )
-
-        plt.close()
-
-        print(f"Saved: {fig4}")
-
-    else:
-
-        print(
-            "\nWarning: metrics.csv is missing "
-            "required error columns."
-        )
-
-else:
-
-    print(
-        "\nWarning: metrics.csv not found. "
-        "Skipping Figure 4."
+    metadata = pd.read_csv(
+        METADATA_FILE
     )
 
+    required_metadata_columns = [
+        "utterance_id",
+        "reference",
+    ]
+
+    missing_metadata = [
+        column
+        for column in required_metadata_columns
+        if column not in metadata.columns
+    ]
+
+    if missing_metadata:
+        raise ValueError(
+            "Missing columns in metadata_ground_truth.csv:\n"
+            + "\n".join(missing_metadata)
+        )
+
+    metadata = metadata.copy()
+
+    metadata["reference_length"] = (
+        metadata["reference"]
+        .astype(str)
+        .str.split()
+        .str.len()
+    )
+
+    reference_lengths = (
+        metadata[
+            [
+                "utterance_id",
+                "reference_length",
+            ]
+        ]
+        .drop_duplicates(
+            "utterance_id"
+        )
+    )
+
+    # --------------------------------------------------------
+    # Merge reference lengths
+    # --------------------------------------------------------
+
+    metrics = metrics.merge(
+        reference_lengths,
+        on="utterance_id",
+        how="left",
+        validate="many_to_one",
+    )
+
+    if metrics[
+        "reference_length"
+    ].isna().any():
+
+        raise ValueError(
+            "Some recordings are missing "
+            "reference word counts."
+        )
+
+    # --------------------------------------------------------
+    # Normalize errors
+    # --------------------------------------------------------
+
+    for error_type in [
+        "substitutions",
+        "deletions",
+        "insertions",
+    ]:
+
+        metrics[
+            f"{error_type}_rate"
+        ] = (
+            metrics[error_type]
+            / metrics["reference_length"]
+        )
+
+    # --------------------------------------------------------
+    # Aggregate
+    # --------------------------------------------------------
+
+    summary = (
+        metrics
+        .groupby("mode")[
+            [
+                "substitutions_rate",
+                "deletions_rate",
+                "insertions_rate",
+            ]
+        ]
+        .mean()
+        .reindex(
+            ["speech", "singing"]
+        )
+    )
+
+    return summary
+
+
+def plot_normalized_error_types(
+    metrics: pd.DataFrame,
+) -> pd.DataFrame:
+    """Create normalized error-type comparison plot."""
+
+    error_rate_summary = (
+        calculate_normalized_error_rates(
+            metrics
+        )
+    )
+
+    error_rate_summary.to_csv(
+        NORMALIZED_ERRORS_FILE,
+        encoding="utf-8-sig",
+    )
+
+    ax = error_rate_summary.T.plot(
+        kind="bar",
+        figsize=(8, 6),
+    )
+
+    ax.set_xlabel(
+        "Error Type",
+        fontsize=12,
+    )
+
+    ax.set_ylabel(
+        "Mean Error Rate per Reference Word",
+        fontsize=12,
+    )
+
+    ax.set_title(
+        "Normalized ASR Error Types: Speech vs Singing",
+        fontsize=15,
+    )
+
+    ax.set_xticklabels(
+        [
+            "Substitutions",
+            "Deletions",
+            "Insertions",
+        ],
+        rotation=0,
+    )
+
+    ax.grid(
+        axis="y",
+        alpha=0.25,
+    )
+
+    ax.legend(
+        title="Mode"
+    )
+
+    plt.tight_layout()
+
+    output_file = (
+        FIGURES_DIR
+        / "fig4_error_types.png"
+    )
+
+    plt.savefig(
+        output_file,
+        dpi=300,
+        bbox_inches="tight",
+    )
+
+    plt.close()
+
+    print(
+        f"Saved: {output_file}"
+    )
+
+    return error_rate_summary
+
 
 # ============================================================
-# 12. Figure 5
-# Acoustic features vs ΔWER
+# Acoustic analysis
 # ============================================================
 
-print("\nCreating acoustic analysis figures...")
-
-acoustic_candidates = [
-
+ACOUSTIC_FEATURES = [
     (
         "duration_singing",
         "Singing Duration (sec)",
         "fig5_duration_vs_delta_wer.png",
     ),
-
     (
         "singing_mean_f0",
         "Mean F0 in Singing (Hz)",
         "fig5_mean_f0_vs_delta_wer.png",
     ),
-
     (
         "singing_f0_std",
         "F0 Variability in Singing (Hz)",
         "fig5_f0_std_vs_delta_wer.png",
     ),
-
     (
         "singing_f0_range",
         "F0 Range in Singing (Hz)",
         "fig5_f0_range_vs_delta_wer.png",
     ),
-
     (
         "singing_rms",
         "Singing RMS",
@@ -816,48 +980,103 @@ acoustic_candidates = [
     ),
 ]
 
-correlation_rows = []
 
+def calculate_acoustic_correlations(
+    df: pd.DataFrame,
+) -> pd.DataFrame:
+    """Calculate Pearson correlations between acoustic features and ΔWER."""
 
-for column, x_label, filename in acoustic_candidates:
+    rows = []
 
-    if column not in df.columns:
+    for (
+        feature,
+        _,
+        _,
+    ) in ACOUSTIC_FEATURES:
 
-        print(
-            f"Skipping {column}: "
-            "column not found."
+        if feature not in df.columns:
+
+            print(
+                f"Skipping {feature}: column not found."
+            )
+
+            continue
+
+        subset = (
+            df[
+                [
+                    feature,
+                    "delta_WER",
+                ]
+            ]
+            .dropna()
         )
 
-        continue
+        if len(subset) < 3:
 
-    subset = df[
-        [column, "delta_WER"]
-    ].dropna()
+            print(
+                f"Skipping {feature}: "
+                "not enough observations."
+            )
+
+            continue
+
+        x = subset[feature].to_numpy()
+        y = subset["delta_WER"].to_numpy()
+
+        if np.std(x) == 0:
+
+            correlation = np.nan
+
+        else:
+
+            correlation = np.corrcoef(
+                x,
+                y,
+            )[0, 1]
+
+        rows.append({
+            "feature": feature,
+            "n": len(subset),
+            "pearson_r": correlation,
+        })
+
+    return pd.DataFrame(rows)
+
+
+def plot_acoustic_feature(
+    df: pd.DataFrame,
+    feature: str,
+    x_label: str,
+    filename: str,
+) -> None:
+    """Create one acoustic feature vs ΔWER scatter plot."""
+
+    subset = (
+        df[
+            [
+                feature,
+                "delta_WER",
+            ]
+        ]
+        .dropna()
+    )
 
     if len(subset) < 3:
 
         print(
-            f"Skipping {column}: "
+            f"Skipping {feature}: "
             "not enough observations."
         )
 
-        continue
+        return
 
-    x = subset[column].to_numpy()
+    x = subset[feature].to_numpy()
     y = subset["delta_WER"].to_numpy()
 
-    correlation = np.corrcoef(
-        x,
-        y,
-    )[0, 1]
-
-    correlation_rows.append({
-        "feature": column,
-        "n": len(subset),
-        "pearson_r": correlation,
-    })
-
-    plt.figure(figsize=(7, 6))
+    plt.figure(
+        figsize=(7, 6)
+    )
 
     plt.scatter(
         x,
@@ -866,13 +1085,18 @@ for column, x_label, filename in acoustic_candidates:
         alpha=0.75,
     )
 
-    # Regression line
+    # --------------------------------------------------------
+    # Linear trend
+    # --------------------------------------------------------
+
     if np.std(x) > 0:
 
-        slope, intercept = np.polyfit(
-            x,
-            y,
-            1,
+        slope, intercept = (
+            np.polyfit(
+                x,
+                y,
+                1,
+            )
         )
 
         x_line = np.linspace(
@@ -936,163 +1160,459 @@ for column, x_label, filename in acoustic_candidates:
     )
 
 
-correlation_df = pd.DataFrame(
-    correlation_rows
-)
+def run_acoustic_analysis(
+    df: pd.DataFrame,
+) -> pd.DataFrame:
+    """Generate acoustic plots and correlation table."""
 
-correlation_file = (
-    RESULTS_DIR
-    / "acoustic_correlations.csv"
-)
-
-correlation_df.to_csv(
-    correlation_file,
-    index=False,
-)
-
-
-# ============================================================
-# 13. Create analysis summary
-# ============================================================
-
-summary_lines = []
-
-summary_lines.append(
-    "Singing ASR Benchmark - Exploratory Analysis"
-)
-
-summary_lines.append(
-    "=" * 60
-)
-
-summary_lines.append(
-    f"\nNumber of paired utterances: {len(df)}"
-)
-
-summary_lines.append(
-    "\nOverall performance:"
-)
-
-for _, row in summary_df.iterrows():
-
-    summary_lines.append(
-        f"\n{row['metric']}:"
-        f"\n  Speech mean    = "
-        f"{row['speech_mean']:.4f}"
-        f"\n  Singing mean   = "
-        f"{row['singing_mean']:.4f}"
-        f"\n  Mean Δ         = "
-        f"{row['mean_delta']:.4f}"
-        f"\n  Speech median  = "
-        f"{row['speech_median']:.4f}"
-        f"\n  Singing median = "
-        f"{row['singing_median']:.4f}"
-        f"\n  Median Δ       = "
-        f"{row['median_delta']:.4f}"
+    print(
+        "\nCreating acoustic analysis figures..."
     )
 
+    for (
+        feature,
+        x_label,
+        filename,
+    ) in ACOUSTIC_FEATURES:
 
-summary_lines.append(
-    "\n\nWilcoxon signed-rank tests:"
-)
+        if feature not in df.columns:
 
-for _, row in stats_df.iterrows():
+            print(
+                f"Skipping {feature}: "
+                "column not found."
+            )
 
-    summary_lines.append(
-        f"\n{row['metric']}:"
-        f"\n  n pairs   = "
-        f"{int(row['n_pairs'])}"
-        f"\n  statistic = "
-        f"{row['statistic']:.4f}"
-        f"\n  p-value   = "
-        f"{row['p_value']:.6f}"
-        f"\n  effect r  = "
-        f"{row['effect_r']:.4f}"
-    )
+            continue
 
-
-summary_lines.append(
-    "\n\nAcoustic correlations:"
-)
-
-if len(correlation_df) > 0:
-
-    for _, row in correlation_df.iterrows():
-
-        summary_lines.append(
-            f"\n  {row['feature']}: "
-            f"r = {row['pearson_r']:.4f} "
-            f"(n={int(row['n'])})"
+        plot_acoustic_feature(
+            df,
+            feature,
+            x_label,
+            filename,
         )
 
-else:
-
-    summary_lines.append(
-        "\n  No acoustic correlations calculated."
+    correlation_df = (
+        calculate_acoustic_correlations(
+            df
+        )
     )
 
-
-summary_lines.append(
-    "\n\nInterpretation note:"
-)
-
-summary_lines.append(
-    "Acoustic analyses are exploratory because "
-    "the current dataset contains only 18 paired utterances."
-)
-
-summary_file = (
-    RESULTS_DIR
-    / "analysis_summary.txt"
-)
-
-with open(
-    summary_file,
-    "w",
-    encoding="utf-8",
-) as f:
-
-    f.write(
-        "\n".join(summary_lines)
+    correlation_df.to_csv(
+        ACOUSTIC_CORRELATIONS_FILE,
+        index=False,
+        encoding="utf-8-sig",
     )
 
-print(
-    f"\nSaved: {summary_file}"
-)
+    return correlation_df
 
 
 # ============================================================
-# 14. Finish
+# Summary text
 # ============================================================
 
-print("\n" + "=" * 60)
-print("Analysis complete!")
-print("=" * 60)
+def create_text_summary(
+    df: pd.DataFrame,
+    summary_df: pd.DataFrame,
+    stats_df: pd.DataFrame,
+    correlation_df: pd.DataFrame,
+) -> None:
+    """Write a human-readable analysis summary."""
 
-print("\nGenerated files:")
+    lines = []
 
-print(
-    "  results/overall_summary.csv"
-)
+    lines.append(
+        "Singing ASR Benchmark - Exploratory Analysis"
+    )
 
-print(
-    "  results/statistical_tests.csv"
-)
+    lines.append(
+        "=" * 60
+    )
 
-print(
-    "  results/normalized_error_rates.csv"
-)
+    lines.append(
+        f"\nNumber of paired utterances: {len(df)}"
+    )
 
-print(
-    "  results/acoustic_correlations.csv"
-)
+    # --------------------------------------------------------
+    # Overall results
+    # --------------------------------------------------------
 
-print(
-    "  results/analysis_summary.txt"
-)
+    lines.append(
+        "\nOverall performance:"
+    )
 
-print(
-    "  results/figures/"
-)
+    for _, row in summary_df.iterrows():
 
-print("\nDone.")
+        lines.append(
+            f"\n{row['metric']}:"
+            f"\n  Speech mean    = "
+            f"{row['speech_mean']:.4f}"
+            f"\n  Singing mean   = "
+            f"{row['singing_mean']:.4f}"
+            f"\n  Mean Δ         = "
+            f"{row['mean_delta']:.4f}"
+            f"\n  Speech median  = "
+            f"{row['speech_median']:.4f}"
+            f"\n  Singing median = "
+            f"{row['singing_median']:.4f}"
+            f"\n  Median Δ       = "
+            f"{row['median_delta']:.4f}"
+        )
+
+    # --------------------------------------------------------
+    # Statistical tests
+    # --------------------------------------------------------
+
+    lines.append(
+        "\n\nWilcoxon signed-rank tests:"
+    )
+
+    for _, row in stats_df.iterrows():
+
+        lines.append(
+            f"\n{row['metric']}:"
+            f"\n  n pairs   = "
+            f"{int(row['n_pairs'])}"
+            f"\n  statistic = "
+            f"{row['statistic']:.4f}"
+            f"\n  p-value   = "
+            f"{row['p_value']:.6f}"
+            f"\n  effect r  = "
+            f"{row['effect_r']:.4f}"
+        )
+
+    # --------------------------------------------------------
+    # Direction of effect
+    # --------------------------------------------------------
+
+    delta = df["delta_WER"]
+
+    lines.append(
+        "\n\nDirection of singing effect:"
+    )
+
+    lines.append(
+        f"\n  Singing WER > Speech WER: "
+        f"{(delta > 0).sum()}"
+    )
+
+    lines.append(
+        f"\n  Singing WER = Speech WER: "
+        f"{(delta == 0).sum()}"
+    )
+
+    lines.append(
+        f"\n  Singing WER < Speech WER: "
+        f"{(delta < 0).sum()}"
+    )
+
+    # --------------------------------------------------------
+    # Acoustic analysis
+    # --------------------------------------------------------
+
+    lines.append(
+        "\n\nAcoustic correlations:"
+    )
+
+    if len(correlation_df) > 0:
+
+        for _, row in correlation_df.iterrows():
+
+            correlation = row[
+                "pearson_r"
+            ]
+
+            if pd.isna(correlation):
+
+                correlation_text = "NaN"
+
+            else:
+
+                correlation_text = (
+                    f"{correlation:.4f}"
+                )
+
+            lines.append(
+                f"\n  {row['feature']}: "
+                f"r = {correlation_text} "
+                f"(n={int(row['n'])})"
+            )
+
+    else:
+
+        lines.append(
+            "\n  No acoustic correlations calculated."
+        )
+
+    # --------------------------------------------------------
+    # Interpretation note
+    # --------------------------------------------------------
+
+    lines.append(
+        "\n\nInterpretation note:"
+    )
+
+    lines.append(
+        "Acoustic analyses are exploratory because "
+        "the current dataset contains only 18 paired utterances "
+        "and pitch-based features may contain measurement noise."
+    )
+
+    with open(
+        ANALYSIS_SUMMARY_FILE,
+        "w",
+        encoding="utf-8",
+    ) as file:
+
+        file.write(
+            "\n".join(lines)
+        )
+
+
+# ============================================================
+# Main pipeline
+# ============================================================
+
+def main() -> None:
+    """Run the complete final analysis pipeline."""
+
+    print("=" * 70)
+    print("SINGING ASR BENCHMARK")
+    print("Final Exploratory Analysis")
+    print("=" * 70)
+
+    # --------------------------------------------------------
+    # Create output directory
+    # --------------------------------------------------------
+
+    RESULTS_DIR.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    FIGURES_DIR.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    # --------------------------------------------------------
+    # Load data
+    # --------------------------------------------------------
+
+    df = load_final_analysis()
+
+    df = standardize_categories(
+        df
+    )
+
+    print(
+        f"\nFinal analysis rows: "
+        f"{len(df)}"
+    )
+
+    print(
+        f"Languages: "
+        f"{df['language'].unique().tolist()}"
+    )
+
+    print(
+        f"Length groups: "
+        f"{df['length_group'].unique().tolist()}"
+    )
+
+    # --------------------------------------------------------
+    # Overall summary
+    # --------------------------------------------------------
+
+    summary_df = (
+        calculate_overall_summary(
+            df
+        )
+    )
+
+    summary_df.to_csv(
+        OVERALL_SUMMARY_FILE,
+        index=False,
+        encoding="utf-8-sig",
+    )
+
+    print(
+        "\nOverall summary:"
+    )
+
+    print(
+        summary_df
+        .round(4)
+        .to_string(index=False)
+    )
+
+    # --------------------------------------------------------
+    # Statistical tests
+    # --------------------------------------------------------
+
+    stats_df = (
+        calculate_statistical_tests(
+            df
+        )
+    )
+
+    stats_df.to_csv(
+        STATISTICS_FILE,
+        index=False,
+        encoding="utf-8-sig",
+    )
+
+    print(
+        "\nWilcoxon signed-rank tests:"
+    )
+
+    print(
+        stats_df
+        .round(4)
+        .to_string(index=False)
+    )
+
+    # --------------------------------------------------------
+    # Figures
+    # --------------------------------------------------------
+
+    print(
+        "\nCreating figures..."
+    )
+
+    plot_paired_wer(
+        df
+    )
+
+    plot_wer_by_language(
+        df
+    )
+
+    plot_delta_wer_by_length(
+        df
+    )
+
+    # --------------------------------------------------------
+    # Normalized error types
+    # --------------------------------------------------------
+
+    if METRICS_FILE.exists():
+
+        metrics = pd.read_csv(
+            METRICS_FILE
+        )
+
+        print(
+            "\nCreating normalized error analysis..."
+        )
+
+        normalized_errors = (
+            plot_normalized_error_types(
+                metrics
+            )
+        )
+
+        print(
+            "\nNormalized error rates:"
+        )
+
+        print(
+            normalized_errors
+            .round(4)
+            .to_string()
+        )
+
+    else:
+
+        print(
+            "\nWarning: metrics.csv not found. "
+            "Skipping normalized error analysis."
+        )
+
+        normalized_errors = (
+            pd.DataFrame()
+        )
+
+    # --------------------------------------------------------
+    # Acoustic analysis
+    # --------------------------------------------------------
+
+    correlation_df = (
+        run_acoustic_analysis(
+            df
+        )
+    )
+
+    print(
+        "\nAcoustic correlations:"
+    )
+
+    print(
+        correlation_df
+        .round(4)
+        .to_string(index=False)
+    )
+
+    # --------------------------------------------------------
+    # Text summary
+    # --------------------------------------------------------
+
+    create_text_summary(
+        df,
+        summary_df,
+        stats_df,
+        correlation_df,
+    )
+
+    # --------------------------------------------------------
+    # Final summary
+    # --------------------------------------------------------
+
+    print(
+        "\n" + "=" * 70
+    )
+
+    print(
+        "FINAL ANALYSIS COMPLETE"
+    )
+
+    print(
+        "=" * 70
+    )
+
+    print(
+        "\nGenerated files:"
+    )
+
+    print(
+        f"  {OVERALL_SUMMARY_FILE}"
+    )
+
+    print(
+        f"  {STATISTICS_FILE}"
+    )
+
+    print(
+        f"  {NORMALIZED_ERRORS_FILE}"
+    )
+
+    print(
+        f"  {ACOUSTIC_CORRELATIONS_FILE}"
+    )
+
+    print(
+        f"  {ANALYSIS_SUMMARY_FILE}"
+    )
+
+    print(
+        f"  {FIGURES_DIR}"
+    )
+
+    print("\nDone.")
+
+
+# ============================================================
+# Entry point
+# ============================================================
+
+if __name__ == "__main__":
+    main()
